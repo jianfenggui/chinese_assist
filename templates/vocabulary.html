@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>词汇助手</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <h1>词汇助手</h1>
+
+    <form action="/vocabulary" method="post">
+        <input type="text" name="words" placeholder="输入词汇，用空格分隔">
+        <input type="submit" value="提交词汇">
+    </form>
+
+    <h2>词汇列表</h2>
+    <div id="vocabulary-list">
+        {% if words %}
+            <ul>
+                {% for word in words %}
+                    <li class="vocab-word">{{ word }}</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>暂无词汇，请通过上方表单添加。</p>
+        {% endif %}
+    </div>
+
+    <button id="dictate-button">听写</button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const dictateButton = document.getElementById('dictate-button');
+            
+            if (dictateButton) {
+                dictateButton.addEventListener('click', () => {
+                    const wordElements = document.querySelectorAll('.vocab-word');
+                    const wordsArray = Array.from(wordElements).map(el => el.textContent.trim());
+
+                    if (!wordsArray.length) {
+                        alert('请先添加词汇。');
+                        return;
+                    }
+
+                    if (!window.speechSynthesis) {
+                        alert('您的浏览器不支持语音合成功能。');
+                        console.log('Speech synthesis not supported.');
+                        return;
+                    }
+
+                    function speakWords(words, index) {
+                        if (index >= words.length) {
+                            // Optional: Announce completion
+                            const completionUtterance = new SpeechSynthesisUtterance("听写结束");
+                            completionUtterance.lang = 'zh-CN';
+                            window.speechSynthesis.speak(completionUtterance);
+                            return;
+                        }
+
+                        const utterance = new SpeechSynthesisUtterance(words[index]);
+                        utterance.lang = 'zh-CN';
+                        
+                        // Ensure previous utterance is cleared before speaking next one
+                        // and handle potential errors or interruptions.
+                        utterance.onend = () => {
+                            setTimeout(() => {
+                                speakWords(words, index + 1);
+                            }, 5000); // 5 seconds delay
+                        };
+                        
+                        utterance.onerror = (event) => {
+                            console.error('SpeechSynthesisUtterance.onerror', event);
+                            // Optionally, try to continue with the next word or stop
+                            setTimeout(() => {
+                                speakWords(words, index + 1); // Try next word even if current fails
+                            }, 5000);
+                        };
+                        
+                        window.speechSynthesis.speak(utterance);
+                    }
+
+                    // Cancel any ongoing speech before starting a new dictation
+                    window.speechSynthesis.cancel(); 
+                    speakWords(wordsArray, 0);
+                });
+            } else {
+                console.error('Dictate button not found.');
+            }
+        });
+    </script>
+</body>
+</html>
