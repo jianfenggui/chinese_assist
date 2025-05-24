@@ -18,7 +18,7 @@
         {% if words %}
             <ul>
                 {% for word in words %}
-                    <li class="vocab-word">{{ word }}</li>
+                    <li class="vocab-word">{{ word }} <button class="explain-button" data-word="{{ word }}" onclick="handleExplainWord(this.dataset.word)">Explain</button></li>
                 {% endfor %}
             </ul>
         {% else %}
@@ -26,9 +26,64 @@
         {% endif %}
     </div>
 
+    <div id="explanation-area">
+        Word explanations will appear here.
+    </div>
+
     <button id="dictate-button">听写</button>
 
     <script>
+        async function handleExplainWord(word) {
+            console.log("Explain word:", word);
+            const explanationArea = document.getElementById('explanation-area');
+            if (!explanationArea) {
+                console.error("Explanation area not found!");
+                return;
+            }
+            explanationArea.innerHTML = 'Fetching explanation...'; // Indicate loading
+
+            const apiKey = "AIzaSyBiPSZpw3anpuGCQ4OHJIFt3OokmG22RG4";
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+
+            const requestBody = {
+                "contents": [{
+                    "parts": [{
+                        "text": "Explain the word: " + word + ". Keep the explanation concise and suitable for a language learner."
+                    }]
+                }]
+            };
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    console.error("API request failed:", response.status, await response.text());
+                    explanationArea.innerHTML = "Sorry, there was an error communicating with the explanation service.";
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) {
+                    const explanation = data.candidates[0].content.parts[0].text;
+                    explanationArea.innerHTML = explanation;
+                } else {
+                    console.error("Invalid API response structure:", data);
+                    explanationArea.innerHTML = "Sorry, I couldn't find an explanation for this word.";
+                }
+
+            } catch (error) {
+                console.error("Error during API call:", error);
+                explanationArea.innerHTML = "Sorry, an unexpected error occurred while fetching the explanation.";
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const dictateButton = document.getElementById('dictate-button');
             

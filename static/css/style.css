@@ -78,3 +78,27 @@ body > h1 + button, body > h1 + button + button, body > h1 + button + button + b
     display: block;
     margin: 20px auto; /* Center the dictate button */
 }
+
+/* Styles for Explain Button */
+.explain-button {
+    margin-left: 8px;
+    padding: 5px 10px; /* Adjusted padding */
+    font-size: 0.9em; /* Slightly smaller font */
+    background-color: #28a745; /* Green background */
+    /* Inherits color, border, border-radius, cursor from general button styles */
+}
+
+.explain-button:hover {
+    background-color: #218838; /* Darker green on hover */
+}
+
+/* Styles for Explanation Area */
+#explanation-area {
+    margin-top: 15px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    padding: 10px;
+    min-height: 50px;
+    background-color: #f9f9f9;
+    border-radius: 5px; /* Added for consistency */
+}
