@@ -118,9 +118,9 @@
                     pauseResumeButton.textContent = 'Pause';
                     pauseResumeButton.style.display = 'none';
                 }
-                currentWordsArray = [];
+                currentWordsArray = []; // Ensure currentWordsArray is cleared
                 currentWordIndex = 0;
-                currentDictationWord = null; // Reset the currently dictated word
+                currentDictationWord = null; 
             }
 
             if (pauseResumeButton) {
@@ -160,34 +160,36 @@
             
             if (dictateButton) {
                 dictateButton.addEventListener('click', () => {
-                    const wordElements = document.querySelectorAll('.vocab-word');
-                    currentWordsArray = Array.from(wordElements).map(el => {
-                        const firstChild = el.childNodes[0]; // Assumes word text is the first child node
-                        return firstChild ? firstChild.textContent.trim() : '';
-                    }).filter(word => word); // Filter out any empty strings
-
-
-                    if (!currentWordsArray.length) {
-                        alert('请先添加词汇。');
-                        return;
-                    }
-
+                    // Basic checks
                     if (!window.speechSynthesis) {
                         alert('您的浏览器不支持语音合成功能。');
                         console.log('Speech synthesis not supported.');
                         return;
                     }
-                    
-                    window.speechSynthesis.cancel(); // Stop any previous speech before starting anew
-                    resetDictationState();           // Reset state variables and UI
-                    if (pauseResumeButton) {
-                        pauseResumeButton.style.display = 'inline-block'; // Show the pause button
-                        pauseResumeButton.textContent = 'Pause'; // Ensure it's set to Pause
+
+                    window.speechSynthesis.cancel(); // 1. Stop any previous speech
+                    resetDictationState();           // 2. Reset state variables (currentWordsArray is now empty)
+
+                    const wordElements = document.querySelectorAll('.vocab-word'); // 3. Get words from DOM
+                    currentWordsArray = Array.from(wordElements).map(el => {    //    Repopulate currentWordsArray
+                        const firstChild = el.childNodes[0]; 
+                        return firstChild ? firstChild.textContent.trim() : '';
+                    }).filter(word => word);
+
+                    if (!currentWordsArray.length) { // 4. Check if currentWordsArray is empty
+                        alert('请先添加词汇。');
+                        return; // No words to speak
                     }
-                    isDictationPaused = false; // Ensure pause state is reset
                     
-                    currentWordIndex = 0;
-                    speakNextWord(); // Start dictation sequence
+                    // 5. isDictationPaused is false (from resetDictationState)
+                    // 6. currentWordIndex is 0 (from resetDictationState)
+
+                    if (pauseResumeButton) { // 7. Update UI for pauseResumeButton
+                        pauseResumeButton.style.display = 'inline-block';
+                        pauseResumeButton.textContent = 'Pause';
+                    }
+                    
+                    speakNextWord(); // 8. Start dictation sequence
                 });
             } else {
                 console.error('Dictate button not found.');
