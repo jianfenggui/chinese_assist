@@ -1,6 +1,7 @@
+import argparse
 from flask import Flask, render_template, request, redirect, url_for
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='/static', static_folder='static')
 
 vocabulary_list = []
 
@@ -29,4 +30,8 @@ def classical():
     return render_template('classical.html')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    parser = argparse.ArgumentParser(description='Run the Flask app.')
+    parser.add_argument('-p', '--port', type=int, default=8089,
+                        help='port number to listen on')
+    args = parser.parse_args()
+    app.run(debug=True, host='0.0.0.0', port=args.port)

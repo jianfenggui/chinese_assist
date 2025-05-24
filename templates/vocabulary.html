@@ -66,7 +66,7 @@
                 explanationArea.innerHTML = 'Fetching explanation...'; // Indicate loading
 
                 const apiKey = "AIzaSyBiPSZpw3anpuGCQ4OHJIFt3OokmG22RG4"; // Consider moving API key to a more secure place or server-side if possible
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
                 const requestBody = {
                     "contents": [{
@@ -132,32 +132,20 @@
                     }
 
                     if (isDictationPaused) {
-                        // Attempt to resume
-                        isDictationPaused = false; // Set state before calling resume
-                        window.speechSynthesis.resume();
+                        // 恢复
+                        isDictationPaused = false;
                         pauseResumeButton.textContent = 'Pause';
-                        // If speech wasn't actually speaking (e.g., paused between words),
-                        // or if resume() doesn't auto-trigger next word, call speakNextWord.
-                        // The check currentWordIndex < currentWordsArray.length ensures we don't call it if dictation ended.
-                        if (currentWordIndex < currentWordsArray.length) {
-                           // Call speakNextWord directly to ensure the sequence continues,
-                           // especially if it was paused before an utterance started.
-                           // The speakNextWord function itself checks isDictationPaused.
-                           speakNextWord();
-                        }
-                    } else if (window.speechSynthesis.speaking) {
-                        // Attempt to pause
-                        window.speechSynthesis.pause();
-                        isDictationPaused = true;
-                        pauseResumeButton.textContent = 'Resume';
+                        console.log('[PAUSE/RESUME] 点击Resume，直接调用speakNextWord，isDictationPaused:', isDictationPaused, 'speaking:', window.speechSynthesis.speaking, 'paused:', window.speechSynthesis.paused);
+                        speakNextWord();
                     } else {
-                        // Neither speaking nor paused but button was clicked (should ideally not happen if button is managed well)
-                        console.log("Pause/Resume clicked but speech is not active.");
-                        // resetDictationState(); // Optionally reset if this state is reached
+                        // 暂停：取消当前语音，阻止后续朗读
+                        isDictationPaused = true;
+                        window.speechSynthesis.cancel();
+                        pauseResumeButton.textContent = 'Resume';
+                        console.log('[PAUSE/RESUME] 点击Pause，调用window.speechSynthesis.cancel()，isDictationPaused:', isDictationPaused, 'speaking:', window.speechSynthesis.speaking, 'paused:', window.speechSynthesis.paused);
                     }
                 });
             }
-            
             if (dictateButton) {
                 dictateButton.addEventListener('click', () => {
                     // Basic checks
@@ -196,8 +184,10 @@
             }
 
             function speakNextWord() {
+                console.log('[DICTATION] speakNextWord called, isDictationPaused:', isDictationPaused, 'currentWordIndex:', currentWordIndex, 'wordsArray:', currentWordsArray, 'speaking:', window.speechSynthesis.speaking, 'paused:', window.speechSynthesis.paused);
                 // If paused, do not proceed to speak. Wait for resume.
                 if (isDictationPaused) {
+                    console.log('[DICTATION] 暂停状态，speakNextWord直接return');
                     return;
                 }
 
@@ -207,54 +197,61 @@
                         const completionUtterance = new SpeechSynthesisUtterance("听写结束");
                         completionUtterance.lang = 'zh-CN';
                         completionUtterance.onend = resetDictationState; // Reset after "听写结束"
+                        console.log('[DICTATION] 所有单词播报完毕，播报"听写结束"');
                         window.speechSynthesis.speak(completionUtterance);
                     } else {
                         // If still speaking, the onend of the current word will handle this.
+                        console.log('[DICTATION] 所有单词播报完毕，但仍在speaking，等待onend触发');
                     }
                     return;
                 }
 
-                // Check if already speaking. If so, the onend handler will call speakNextWord.
-                // This prevents queuing multiple words if speakNextWord is called rapidly.
-                // However, this check might be too restrictive if not handled carefully with resume.
-                // For now, let's assume direct calls manage state correctly.
-                // if (window.speechSynthesis.speaking) return;
-
-
                 currentDictationWord = currentWordsArray[currentWordIndex]; // Update current dictation word
                 const utterance = new SpeechSynthesisUtterance(currentDictationWord);
                 utterance.lang = 'zh-CN';
+                console.log('[DICTATION] 开始播报单词：', currentDictationWord, 'index:', currentWordIndex);
                 
                 utterance.onend = () => {
+                    console.log('[DICTATION] onend触发，isDictationPaused:', isDictationPaused, 'currentWordIndex:', currentWordIndex);
                     if (isDictationPaused) { 
                         // If paused, onend might fire. Do nothing, wait for resume.
+                        console.log('[DICTATION] onend时处于暂停状态，等待resume');
                         return; 
                     }
                     currentWordIndex++;
                     // Check if there are more words or if it's the end
                     if (currentWordIndex < currentWordsArray.length) {
-                        setTimeout(speakNextWord, 5000); // Delay before next word
+                        setTimeout(() => {
+                            if (!isDictationPaused) {
+                                console.log('[DICTATION] 延迟后继续播报下一个单词');
+                                speakNextWord();
+                            } else {
+                                console.log('[DICTATION] 延迟后发现已暂停，不继续播报');
+                            }
+                        }, 5000); // Delay before next word
                     } else {
                         // Last word has been spoken, announce completion
                         const completionUtterance = new SpeechSynthesisUtterance("听写结束");
                         completionUtterance.lang = 'zh-CN';
                         completionUtterance.onend = resetDictationState; // Reset after "听写结束"
+                        console.log('[DICTATION] 最后一个单词播报完毕，播报"听写结束"');
                         window.speechSynthesis.speak(completionUtterance);
                     }
                 };
                 
                 utterance.onerror = (event) => {
-                    console.error('SpeechSynthesisUtterance.onerror', event);
+                    console.error('[DICTATION] SpeechSynthesisUtterance.onerror', event);
                     resetDictationState(); // Reset state on any speech error
                 };
                 
                 // Check if already speaking before trying to speak.
                 // This is a safeguard, though cancel() should handle it.
                 if (!window.speechSynthesis.speaking || window.speechSynthesis.paused) {
+                     console.log('[DICTATION] speakNextWord实际调用speak:', currentDictationWord);
                      window.speechSynthesis.speak(utterance);
                 } else {
                     // This case should ideally be handled by the overall state logic
-                    console.log("Speech synthesis busy, utterance for '"+ currentWordsArray[currentWordIndex] +"' not spoken immediately.");
+                    console.log("[DICTATION] Speech synthesis busy, utterance for '"+ currentWordsArray[currentWordIndex] +"' not spoken immediately.");
                 }
             }
         });
