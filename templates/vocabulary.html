@@ -18,7 +18,7 @@
         {% if words %}
             <ul>
                 {% for word in words %}
-                    <li class="vocab-word">{{ word }} <button class="explain-button" data-word="{{ word }}" onclick="handleExplainWord(this.dataset.word)">Explain</button></li>
+                    <li class="vocab-word">{{ word }}</li>
                 {% endfor %}
             </ul>
         {% else %}
@@ -30,69 +30,144 @@
         Word explanations will appear here.
     </div>
 
-    <button id="dictate-button">听写</button>
+    <div> <!-- Wrapper for dictation buttons -->
+        <button id="dictate-button">听写</button>
+        <button id="pause-resume-button" style="display: none;">Pause</button> <!-- Initially hidden -->
+        <button id="global-explain-button">Explain Current Word</button> 
+    </div>
 
     <script>
-        async function handleExplainWord(word) {
-            console.log("Explain word:", word);
-            const explanationArea = document.getElementById('explanation-area');
-            if (!explanationArea) {
-                console.error("Explanation area not found!");
-                return;
-            }
-            explanationArea.innerHTML = 'Fetching explanation...'; // Indicate loading
-
-            const apiKey = "AIzaSyBiPSZpw3anpuGCQ4OHJIFt3OokmG22RG4";
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
-
-            const requestBody = {
-                "contents": [{
-                    "parts": [{
-                        "text": "Explain the word: " + word + ". Keep the explanation concise and suitable for a language learner."
-                    }]
-                }]
-            };
-
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(requestBody)
-                });
-
-                if (!response.ok) {
-                    console.error("API request failed:", response.status, await response.text());
-                    explanationArea.innerHTML = "Sorry, there was an error communicating with the explanation service.";
-                    return;
-                }
-
-                const data = await response.json();
-
-                if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) {
-                    const explanation = data.candidates[0].content.parts[0].text;
-                    explanationArea.innerHTML = explanation;
-                } else {
-                    console.error("Invalid API response structure:", data);
-                    explanationArea.innerHTML = "Sorry, I couldn't find an explanation for this word.";
-                }
-
-            } catch (error) {
-                console.error("Error during API call:", error);
-                explanationArea.innerHTML = "Sorry, an unexpected error occurred while fetching the explanation.";
-            }
-        }
+        let isDictationPaused = false; // This is fine at script level if handleExplainWord is also at script level
+                                     // However, to access currentDictationWord, handleExplainWord needs to be in DOMContentLoaded or receive it.
 
         document.addEventListener('DOMContentLoaded', () => {
             const dictateButton = document.getElementById('dictate-button');
+            const pauseResumeButton = document.getElementById('pause-resume-button');
+            const globalExplainButton = document.getElementById('global-explain-button');
+            const explanationArea = document.getElementById('explanation-area'); // Get ref here for handleExplainWord
+
+            let currentWordsArray = [];
+            let currentWordIndex = 0;
+            let currentDictationWord = null; // Variable to store the currently dictated word
+
+            async function handleExplainWord() { // Removed 'word' parameter
+                if (!explanationArea) {
+                    console.error("Explanation area not found!");
+                    return;
+                }
+
+                if (!currentDictationWord) {
+                    explanationArea.innerHTML = "No word is currently selected for explanation.";
+                    console.log("handleExplainWord called but currentDictationWord is null or empty.");
+                    return;
+                }
+
+                console.log("Explain current word:", currentDictationWord);
+                explanationArea.innerHTML = 'Fetching explanation...'; // Indicate loading
+
+                const apiKey = "AIzaSyBiPSZpw3anpuGCQ4OHJIFt3OokmG22RG4"; // Consider moving API key to a more secure place or server-side if possible
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+
+                const requestBody = {
+                    "contents": [{
+                        "parts": [{
+                            "text": "解释词语: " + currentDictationWord + ". 请用一句话，最简洁的语言解释。比如北京，中国的首都。"
+                        }]
+                    }]
+                };
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(requestBody)
+                    });
+
+                    if (!response.ok) {
+                        console.error("API request failed:", response.status, await response.text());
+                        explanationArea.innerHTML = "Sorry, there was an error communicating with the explanation service.";
+                        return;
+                    }
+
+                    const data = await response.json();
+
+                    if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) {
+                        const explanation = data.candidates[0].content.parts[0].text;
+                        explanationArea.innerHTML = explanation;
+                    } else {
+                        console.error("Invalid API response structure:", data);
+                        explanationArea.innerHTML = "Sorry, I couldn't find an explanation for this word.";
+                    }
+
+                } catch (error) {
+                    console.error("Error during API call:", error);
+                    explanationArea.innerHTML = "Sorry, an unexpected error occurred while fetching the explanation.";
+                }
+            }
+
+            if (globalExplainButton) {
+                globalExplainButton.addEventListener('click', handleExplainWord);
+            }
+
+
+            function resetDictationState() {
+                isDictationPaused = false;
+                if(pauseResumeButton) {
+                    pauseResumeButton.textContent = 'Pause';
+                    pauseResumeButton.style.display = 'none';
+                }
+                currentWordsArray = [];
+                currentWordIndex = 0;
+                currentDictationWord = null; // Reset the currently dictated word
+            }
+
+            if (pauseResumeButton) {
+                pauseResumeButton.addEventListener('click', () => {
+                    if (!window.speechSynthesis) {
+                        console.log('Speech synthesis not supported.');
+                        resetDictationState(); // Reset UI if speech is not supported
+                        return;
+                    }
+
+                    if (isDictationPaused) {
+                        // Attempt to resume
+                        isDictationPaused = false; // Set state before calling resume
+                        window.speechSynthesis.resume();
+                        pauseResumeButton.textContent = 'Pause';
+                        // If speech wasn't actually speaking (e.g., paused between words),
+                        // or if resume() doesn't auto-trigger next word, call speakNextWord.
+                        // The check currentWordIndex < currentWordsArray.length ensures we don't call it if dictation ended.
+                        if (currentWordIndex < currentWordsArray.length) {
+                           // Call speakNextWord directly to ensure the sequence continues,
+                           // especially if it was paused before an utterance started.
+                           // The speakNextWord function itself checks isDictationPaused.
+                           speakNextWord();
+                        }
+                    } else if (window.speechSynthesis.speaking) {
+                        // Attempt to pause
+                        window.speechSynthesis.pause();
+                        isDictationPaused = true;
+                        pauseResumeButton.textContent = 'Resume';
+                    } else {
+                        // Neither speaking nor paused but button was clicked (should ideally not happen if button is managed well)
+                        console.log("Pause/Resume clicked but speech is not active.");
+                        // resetDictationState(); // Optionally reset if this state is reached
+                    }
+                });
+            }
             
             if (dictateButton) {
                 dictateButton.addEventListener('click', () => {
                     const wordElements = document.querySelectorAll('.vocab-word');
-                    const wordsArray = Array.from(wordElements).map(el => el.textContent.trim());
+                    currentWordsArray = Array.from(wordElements).map(el => {
+                        const firstChild = el.childNodes[0]; // Assumes word text is the first child node
+                        return firstChild ? firstChild.textContent.trim() : '';
+                    }).filter(word => word); // Filter out any empty strings
 
-                    if (!wordsArray.length) {
+
+                    if (!currentWordsArray.length) {
                         alert('请先添加词汇。');
                         return;
                     }
@@ -102,44 +177,83 @@
                         console.log('Speech synthesis not supported.');
                         return;
                     }
-
-                    function speakWords(words, index) {
-                        if (index >= words.length) {
-                            // Optional: Announce completion
-                            const completionUtterance = new SpeechSynthesisUtterance("听写结束");
-                            completionUtterance.lang = 'zh-CN';
-                            window.speechSynthesis.speak(completionUtterance);
-                            return;
-                        }
-
-                        const utterance = new SpeechSynthesisUtterance(words[index]);
-                        utterance.lang = 'zh-CN';
-                        
-                        // Ensure previous utterance is cleared before speaking next one
-                        // and handle potential errors or interruptions.
-                        utterance.onend = () => {
-                            setTimeout(() => {
-                                speakWords(words, index + 1);
-                            }, 5000); // 5 seconds delay
-                        };
-                        
-                        utterance.onerror = (event) => {
-                            console.error('SpeechSynthesisUtterance.onerror', event);
-                            // Optionally, try to continue with the next word or stop
-                            setTimeout(() => {
-                                speakWords(words, index + 1); // Try next word even if current fails
-                            }, 5000);
-                        };
-                        
-                        window.speechSynthesis.speak(utterance);
+                    
+                    window.speechSynthesis.cancel(); // Stop any previous speech before starting anew
+                    resetDictationState();           // Reset state variables and UI
+                    if (pauseResumeButton) {
+                        pauseResumeButton.style.display = 'inline-block'; // Show the pause button
+                        pauseResumeButton.textContent = 'Pause'; // Ensure it's set to Pause
                     }
-
-                    // Cancel any ongoing speech before starting a new dictation
-                    window.speechSynthesis.cancel(); 
-                    speakWords(wordsArray, 0);
+                    isDictationPaused = false; // Ensure pause state is reset
+                    
+                    currentWordIndex = 0;
+                    speakNextWord(); // Start dictation sequence
                 });
             } else {
                 console.error('Dictate button not found.');
+            }
+
+            function speakNextWord() {
+                // If paused, do not proceed to speak. Wait for resume.
+                if (isDictationPaused) {
+                    return;
+                }
+
+                if (currentWordIndex >= currentWordsArray.length) {
+                    // All words have been processed
+                    if (!window.speechSynthesis.speaking) { // Ensure no other speech (like the word itself) is active
+                        const completionUtterance = new SpeechSynthesisUtterance("听写结束");
+                        completionUtterance.lang = 'zh-CN';
+                        completionUtterance.onend = resetDictationState; // Reset after "听写结束"
+                        window.speechSynthesis.speak(completionUtterance);
+                    } else {
+                        // If still speaking, the onend of the current word will handle this.
+                    }
+                    return;
+                }
+
+                // Check if already speaking. If so, the onend handler will call speakNextWord.
+                // This prevents queuing multiple words if speakNextWord is called rapidly.
+                // However, this check might be too restrictive if not handled carefully with resume.
+                // For now, let's assume direct calls manage state correctly.
+                // if (window.speechSynthesis.speaking) return;
+
+
+                currentDictationWord = currentWordsArray[currentWordIndex]; // Update current dictation word
+                const utterance = new SpeechSynthesisUtterance(currentDictationWord);
+                utterance.lang = 'zh-CN';
+                
+                utterance.onend = () => {
+                    if (isDictationPaused) { 
+                        // If paused, onend might fire. Do nothing, wait for resume.
+                        return; 
+                    }
+                    currentWordIndex++;
+                    // Check if there are more words or if it's the end
+                    if (currentWordIndex < currentWordsArray.length) {
+                        setTimeout(speakNextWord, 5000); // Delay before next word
+                    } else {
+                        // Last word has been spoken, announce completion
+                        const completionUtterance = new SpeechSynthesisUtterance("听写结束");
+                        completionUtterance.lang = 'zh-CN';
+                        completionUtterance.onend = resetDictationState; // Reset after "听写结束"
+                        window.speechSynthesis.speak(completionUtterance);
+                    }
+                };
+                
+                utterance.onerror = (event) => {
+                    console.error('SpeechSynthesisUtterance.onerror', event);
+                    resetDictationState(); // Reset state on any speech error
+                };
+                
+                // Check if already speaking before trying to speak.
+                // This is a safeguard, though cancel() should handle it.
+                if (!window.speechSynthesis.speaking || window.speechSynthesis.paused) {
+                     window.speechSynthesis.speak(utterance);
+                } else {
+                    // This case should ideally be handled by the overall state logic
+                    console.log("Speech synthesis busy, utterance for '"+ currentWordsArray[currentWordIndex] +"' not spoken immediately.");
+                }
             }
         });
     </script>
