@@ -33,14 +33,27 @@ form {
     align-items: center;
 }
 
-input[type="text"] {
-    padding: 10px;
+.input-section-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.vocabulary-form {
+    width: 100%;
+    max-width: 600px; /* Adjust as needed */
+    margin-bottom: 20px;
+}
+
+input.large-input {
+    padding: 15px; /* Larger padding */
+    font-size: 1.2em; /* Larger font size */
+    width: calc(100% - 120px); /* Adjust width to accommodate button */
     margin-right: 10px;
     border: 1px solid #ddd;
     border-radius: 5px;
-    font-size: 1em;
-    flex-grow: 1;
-    max-width: 400px;
+    box-sizing: border-box; /* Include padding and border in the element's total width and height */
 }
 
 #vocabulary-list {
@@ -49,34 +62,29 @@ input[type="text"] {
     background-color: #fff;
     border: 1px solid #ddd;
     border-radius: 5px;
+    display: grid; /* Use CSS Grid */
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); /* 8 words per line, responsive */
+    gap: 10px; /* Space between words */
+    justify-content: center; /* Center items horizontally */
+    text-align: center; /* Center text within each item */
 }
 
-#vocabulary-list ul {
-    list-style-type: none;
-    padding: 0;
-}
-
-#vocabulary-list li {
-    padding: 8px 0;
-    border-bottom: 1px solid #eee;
-}
-
-#vocabulary-list li:last-child {
-    border-bottom: none;
+.vocab-word-item {
+    padding: 8px 5px;
+    border: 1px solid #eee;
+    border-radius: 3px;
+    background-color: #f9f9f9;
+    white-space: nowrap; /* Prevent words from breaking */
+    overflow: hidden; /* Hide overflow if word is too long */
+    text-overflow: ellipsis; /* Add ellipsis for long words */
 }
 
 /* Centering buttons on the main page */
-body > h1 + button, body > h1 + button + button, body > h1 + button + button + button {
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
-    width: 200px; /* Adjust as needed */
-    margin-bottom: 10px;
-}
-
-#dictate-button {
-    display: block;
-    margin: 20px auto; /* Center the dictate button */
+.button-group {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+    margin-bottom: 20px;
 }
 
 /* Styles for Explain Button */

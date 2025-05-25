@@ -8,26 +8,26 @@
 <body>
     <h1>词汇助手</h1>
 
-    <form action="/vocabulary" method="post">
-        <input type="text" name="words" placeholder="输入词汇，用空格分隔">
-        <input type="submit" value="提交词汇">
-    </form>
+    <div class="input-section-wrapper">
+        <form action="/vocabulary" method="post" class="vocabulary-form">
+            <input type="text" name="words" placeholder="输入词汇，用空格分隔" class="large-input">
+            <input type="submit" value="提交词汇">
+        </form>
 
-    <div id="image-recognition-section" style="margin-top: 20px;">
-        <h3>Or Recognize Words from Image</h3>
-        <input type="file" id="image_file_input" accept="image/*">
-        <button type="button" id="recognize_image_button">Recognize Words from Image</button>
-        <p id="image_recognition_status" style="margin-top: 10px;"></p>
+        <div id="image-recognition-section" style="margin-top: 20px;">
+            <h3>或从图片识别词汇</h3>
+            <input type="file" id="image_file_input" accept="image/*">
+            <button type="button" id="recognize_image_button">从图片识别词汇</button>
+            <p id="image_recognition_status" style="margin-top: 10px;"></p>
+        </div>
     </div>
 
     <h2>词汇列表</h2>
     <div id="vocabulary-list">
         {% if words %}
-            <ul>
-                {% for word in words %}
-                    <li class="vocab-word">{{ word }}</li>
-                {% endfor %}
-            </ul>
+            {% for word in words %}
+                <span class="vocab-word-item">{{ word }}</span>
+            {% endfor %}
         {% else %}
             <p>暂无词汇，请通过上方表单添加。</p>
         {% endif %}
@@ -39,13 +39,12 @@
 
     <div> <!-- Wrapper for dictation buttons -->
         <button id="dictate-button">听写</button>
-        <button id="pause-resume-button" style="display: none;">Pause</button> <!-- Initially hidden -->
-        <button id="global-explain-button">Explain Current Word</button> 
+        <button id="pause-resume-button" style="display: none;">暂停</button> <!-- Initially hidden -->
+        <button id="global-explain-button">解释当前词汇</button> 
     </div>
 
     <script>
-        let isDictationPaused = false; // This is fine at script level if handleExplainWord is also at script level
-                                     // However, to access currentDictationWord, handleExplainWord needs to be in DOMContentLoaded or receive it.
+        let isDictationPaused = false; 
 
         document.addEventListener('DOMContentLoaded', () => {
             const dictateButton = document.getElementById('dictate-button');
@@ -145,14 +144,14 @@
                     if (isDictationPaused) {
                         // 恢复
                         isDictationPaused = false;
-                        pauseResumeButton.textContent = 'Pause';
+                        pauseResumeButton.textContent = '暂停';
                         console.log('[PAUSE/RESUME] 点击Resume，直接调用speakNextWord，isDictationPaused:', isDictationPaused, 'speaking:', window.speechSynthesis.speaking, 'paused:', window.speechSynthesis.paused);
                         speakNextWord();
                     } else {
                         // 暂停：取消当前语音，阻止后续朗读
                         isDictationPaused = true;
                         window.speechSynthesis.cancel();
-                        pauseResumeButton.textContent = 'Resume';
+                        pauseResumeButton.textContent = '继续';
                         console.log('[PAUSE/RESUME] 点击Pause，调用window.speechSynthesis.cancel()，isDictationPaused:', isDictationPaused, 'speaking:', window.speechSynthesis.speaking, 'paused:', window.speechSynthesis.paused);
                     }
                 });
@@ -169,10 +168,9 @@
                     window.speechSynthesis.cancel(); // 1. Stop any previous speech
                     resetDictationState();           // 2. Reset state variables (currentWordsArray is now empty)
 
-                    const wordElements = document.querySelectorAll('.vocab-word'); // 3. Get words from DOM
+                    const wordElements = document.querySelectorAll('.vocab-word-item'); // 3. Get words from DOM
                     currentWordsArray = Array.from(wordElements).map(el => {    //    Repopulate currentWordsArray
-                        const firstChild = el.childNodes[0]; 
-                        return firstChild ? firstChild.textContent.trim() : '';
+                        return el.textContent.trim();
                     }).filter(word => word);
 
                     if (!currentWordsArray.length) { // 4. Check if currentWordsArray is empty
@@ -185,7 +183,7 @@
 
                     if (pauseResumeButton) { // 7. Update UI for pauseResumeButton
                         pauseResumeButton.style.display = 'inline-block';
-                        pauseResumeButton.textContent = 'Pause';
+                        pauseResumeButton.textContent = '暂停';
                     }
                     
                     speakNextWord(); // 8. Start dictation sequence
