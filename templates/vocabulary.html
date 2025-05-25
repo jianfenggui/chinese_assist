@@ -13,6 +13,13 @@
         <input type="submit" value="提交词汇">
     </form>
 
+    <div id="image-recognition-section" style="margin-top: 20px;">
+        <h3>Or Recognize Words from Image</h3>
+        <input type="file" id="image_file_input" accept="image/*">
+        <button type="button" id="recognize_image_button">Recognize Words from Image</button>
+        <p id="image_recognition_status" style="margin-top: 10px;"></p>
+    </div>
+
     <h2>词汇列表</h2>
     <div id="vocabulary-list">
         {% if words %}
@@ -44,7 +51,11 @@
             const dictateButton = document.getElementById('dictate-button');
             const pauseResumeButton = document.getElementById('pause-resume-button');
             const globalExplainButton = document.getElementById('global-explain-button');
-            const explanationArea = document.getElementById('explanation-area'); // Get ref here for handleExplainWord
+            const explanationArea = document.getElementById('explanation-area'); 
+            const imageFileInput = document.getElementById('image_file_input');
+            const recognizeImageButton = document.getElementById('recognize_image_button');
+            const imageRecognitionStatus = document.getElementById('image_recognition_status');
+            const wordsInput = document.querySelector('input[name="words"]');
 
             let currentWordsArray = [];
             let currentWordIndex = 0;
@@ -254,6 +265,75 @@
                     console.log("[DICTATION] Speech synthesis busy, utterance for '"+ currentWordsArray[currentWordIndex] +"' not spoken immediately.");
                 }
             }
+
+            // Image Recognition Logic
+            if (recognizeImageButton) {
+                recognizeImageButton.addEventListener('click', async () => {
+                    if (!imageFileInput || !imageRecognitionStatus || !wordsInput) {
+                        console.error('One or more UI elements for image recognition are missing.');
+                        if(imageRecognitionStatus) imageRecognitionStatus.textContent = 'Error: UI elements missing. Please refresh.';
+                        return;
+                    }
+
+                    const imageFile = imageFileInput.files[0];
+                    console.log('Image file selected:', imageFile);
+
+                    if (!imageFile) {
+                        imageRecognitionStatus.textContent = 'Please select an image file.';
+                        console.log('No image file selected.');
+                        return;
+                    }
+
+                    imageRecognitionStatus.textContent = 'Recognizing...';
+                    console.log('Starting image recognition...');
+
+                    const formData = new FormData();
+                    formData.append('image_file', imageFile);
+
+                    try {
+                        console.log('Sending fetch request to /recognize_image_with_gemini');
+                        const response = await fetch('/recognize_image_with_gemini', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        console.log('Received response from server:', response);
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            console.log('Parsed JSON response:', data);
+                            if (data.recognized_text) {
+                                wordsInput.value = data.recognized_text; // Populate the main vocabulary input
+                                imageRecognitionStatus.textContent = 'Recognition complete.';
+                                console.log('Recognition successful. Text populated.');
+                            } else if (data.error) {
+                                imageRecognitionStatus.textContent = 'Error: ' + data.error;
+                                console.error('Recognition error from server:', data.error);
+                            } else {
+                                imageRecognitionStatus.textContent = 'Recognition complete, but no text found.';
+                                console.log('Recognition complete, but no text found in response.');
+                            }
+                        } else {
+                            let errorMsg = 'Recognition failed. Server returned: ' + response.status;
+                            try {
+                                const errorData = await response.json();
+                                errorMsg = 'Error: ' + (errorData.error || errorData.details || 'Recognition failed.');
+                                console.error('Server error data:', errorData);
+                            } catch (e) {
+                                console.error('Could not parse error JSON:', e);
+                            }
+                            imageRecognitionStatus.textContent = errorMsg;
+                            console.error('Recognition request failed with status:', response.status);
+                        }
+                    } catch (error) {
+                        imageRecognitionStatus.textContent = 'Error: An unexpected error occurred. Check console.';
+                        console.error('Fetch API call failed:', error);
+                    }
+                });
+            } else {
+                console.error('Recognize image button not found.');
+            }
+
         });
     </script>
 </body>
