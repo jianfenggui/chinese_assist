@@ -71,7 +71,7 @@ def recognize_image_with_gemini():
                 print(f"[DEBUG] types.Part.from_text error: {e}")
                 raise
             try:
-                image_part = types.Part.from_data(data=image_bytes, mime_type=image_file.mimetype)
+                image_part = types.Part.from_bytes(data=image_bytes, mime_type=image_file.mimetype)
             except Exception as e:
                 print(f"[DEBUG] types.Part.from_data error: {e}")
                 raise
