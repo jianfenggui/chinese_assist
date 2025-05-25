@@ -4,254 +4,340 @@
     <meta charset="UTF-8">
     <title>词汇助手</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body {
+            background: #f6f8fa;
+            font-family: 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 700px;
+            margin: 40px auto;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            padding: 32px 36px 36px 36px;
+        }
+        h1 {
+            text-align: center;
+            color: #2d3a4b;
+            margin-bottom: 18px;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+        .input-row {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+        }
+        input[type="text"] {
+            width: 420px;
+            height: 44px;
+            font-size: 18px;
+            border: 1.5px solid #d0d7de;
+            border-radius: 8px;
+            padding: 0 16px;
+            margin-right: 0;
+            background: #f9fafb;
+            transition: border 0.2s;
+        }
+        input[type="text"]:focus {
+            border: 1.5px solid #409eff;
+            outline: none;
+        }
+        input[type="submit"] {
+            height: 44px;
+            font-size: 18px;
+            background: #409eff;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0 28px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        input[type="submit"]:hover {
+            background: #1976d2;
+        }
+        .button-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 18px;
+            margin: 24px 0 18px 0;
+        }
+        button {
+            font-size: 17px;
+            padding: 10px 26px;
+            border-radius: 8px;
+            border: none;
+            background: #f0f4fa;
+            color: #2d3a4b;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        button#dictate-button {
+            background: #409eff;
+            color: #fff;
+        }
+        button#dictate-button:hover {
+            background: #1976d2;
+        }
+        button#pause-resume-button {
+            background: #f7b500;
+            color: #fff;
+        }
+        button#pause-resume-button:hover {
+            background: #e09e00;
+        }
+        button#global-explain-button {
+            background: #67c23a;
+            color: #fff;
+        }
+        button#global-explain-button:hover {
+            background: #409a18;
+        }
+        #vocabulary-list {
+            margin: 0 auto 18px auto;
+            text-align: center;
+        }
+        .vocab-table {
+            display: inline-block;
+            margin: 0 auto;
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 12px 18px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .vocab-row {
+            display: flex;
+            justify-content: flex-start;
+            gap: 18px;
+            margin-bottom: 8px;
+        }
+        .vocab-word {
+            font-size: 18px;
+            color: #1976d2;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: #e3f2fd;
+        }
+        #explanation-area {
+            min-height: 24px;
+            text-align: center;
+            color: #888;
+            margin-bottom: 8px;
+        }
+    </style>
 </head>
 <body>
-    <h1>词汇助手</h1>
-
-    <form action="/vocabulary" method="post">
-        <input type="text" name="words" placeholder="输入词汇，用空格分隔">
-        <input type="submit" value="提交词汇">
-    </form>
-
-    <h2>词汇列表</h2>
-    <div id="vocabulary-list">
-        {% if words %}
-            <ul>
-                {% for word in words %}
-                    <li class="vocab-word">{{ word }}</li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p>暂无词汇，请通过上方表单添加。</p>
-        {% endif %}
+    <div class="container">
+        <h1>词汇助手</h1>
+        <form action="/vocabulary" method="post">
+            <div class="input-row">
+                <input type="text" name="words" placeholder="输入词汇，用空格或逗号分隔" autocomplete="off">
+                <input type="submit" value="提交词汇">
+            </div>
+        </form>
+        <div class="button-row">
+            <button id="dictate-button">听写</button>
+            <button id="pause-resume-button" style="display: none;">Pause</button>
+            <button id="global-explain-button">解释词汇</button>
+        </div>
+        <div id="explanation-area"></div>
+        <div id="vocabulary-list"></div>
     </div>
-
-    <div id="explanation-area">
-        Word explanations will appear here.
-    </div>
-
-    <div> <!-- Wrapper for dictation buttons -->
-        <button id="dictate-button">听写</button>
-        <button id="pause-resume-button" style="display: none;">Pause</button> <!-- Initially hidden -->
-        <button id="global-explain-button">Explain Current Word</button> 
-    </div>
-
     <script>
-        let isDictationPaused = false; // This is fine at script level if handleExplainWord is also at script level
-                                     // However, to access currentDictationWord, handleExplainWord needs to be in DOMContentLoaded or receive it.
+        let isDictationPaused = false;
+        let currentWordsArray = [];
+        let currentWordIndex = 0;
+        let currentDictationWord = null;
+        let isDictating = false; // 新增：标记是否正在听写
+        let lastWordsArray = [];
 
         document.addEventListener('DOMContentLoaded', () => {
             const dictateButton = document.getElementById('dictate-button');
             const pauseResumeButton = document.getElementById('pause-resume-button');
             const globalExplainButton = document.getElementById('global-explain-button');
-            const explanationArea = document.getElementById('explanation-area'); // Get ref here for handleExplainWord
+            const explanationArea = document.getElementById('explanation-area');
+            const vocabularyList = document.getElementById('vocabulary-list');
+            const form = document.querySelector('form');
+            const input = form.querySelector('input[type="text"]');
 
-            let currentWordsArray = [];
-            let currentWordIndex = 0;
-            let currentDictationWord = null; // Variable to store the currently dictated word
-
-            async function handleExplainWord() { // Removed 'word' parameter
-                if (!explanationArea) {
-                    console.error("Explanation area not found!");
+            // 词汇渲染函数，每行10个
+            function renderVocabulary(words) {
+                if (!words || !words.length) {
+                    vocabularyList.innerHTML = '';
                     return;
                 }
+                let html = '<div class="vocab-table">';
+                for (let i = 0; i < words.length; i += 10) {
+                    html += '<div class="vocab-row">';
+                    for (let j = i; j < i + 10 && j < words.length; j++) {
+                        html += `<span class="vocab-word">${words[j]}</span>`;
+                    }
+                    html += '</div>';
+                }
+                html += '</div>';
+                vocabularyList.innerHTML = html;
+            }
 
-                if (!currentDictationWord) {
-                    explanationArea.innerHTML = "No word is currently selected for explanation.";
-                    console.log("handleExplainWord called but currentDictationWord is null or empty.");
+            // 解析输入，支持逗号和空格
+            function parseWords(str) {
+                return str.split(/[\s,，]+/).map(w => w.trim()).filter(w => w);
+            }
+
+            // 提交表单时处理
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const words = parseWords(input.value);
+                if (!words.length) {
+                    alert('请输入词汇！');
                     return;
                 }
+                lastWordsArray = words;
+                renderVocabulary([]); // 提交后不显示词汇
+                input.value = '';
+            });
 
-                console.log("Explain current word:", currentDictationWord);
-                explanationArea.innerHTML = 'Fetching explanation...'; // Indicate loading
-
-                const apiKey = "AIzaSyBiPSZpw3anpuGCQ4OHJIFt3OokmG22RG4"; // Consider moving API key to a more secure place or server-side if possible
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-
-                const requestBody = {
-                    "contents": [{
-                        "parts": [{
-                            "text": "解释词语: " + currentDictationWord + ". 请用一句话，最简洁的语言解释。比如北京，中国的首都。"
-                        }]
-                    }]
-                };
-
-                try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(requestBody)
-                    });
-
-                    if (!response.ok) {
-                        console.error("API request failed:", response.status, await response.text());
-                        explanationArea.innerHTML = "Sorry, there was an error communicating with the explanation service.";
-                        return;
-                    }
-
-                    const data = await response.json();
-
-                    if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) {
-                        const explanation = data.candidates[0].content.parts[0].text;
-                        explanationArea.innerHTML = explanation;
-                    } else {
-                        console.error("Invalid API response structure:", data);
-                        explanationArea.innerHTML = "Sorry, I couldn't find an explanation for this word.";
-                    }
-
-                } catch (error) {
-                    console.error("Error during API call:", error);
-                    explanationArea.innerHTML = "Sorry, an unexpected error occurred while fetching the explanation.";
-                }
-            }
-
-            if (globalExplainButton) {
-                globalExplainButton.addEventListener('click', handleExplainWord);
-            }
-
-
-            function resetDictationState() {
-                isDictationPaused = false;
-                if(pauseResumeButton) {
-                    pauseResumeButton.textContent = 'Pause';
-                    pauseResumeButton.style.display = 'none';
-                }
-                currentWordsArray = []; // Ensure currentWordsArray is cleared
-                currentWordIndex = 0;
-                currentDictationWord = null; 
-            }
-
-            if (pauseResumeButton) {
-                pauseResumeButton.addEventListener('click', () => {
-                    if (!window.speechSynthesis) {
-                        console.log('Speech synthesis not supported.');
-                        resetDictationState(); // Reset UI if speech is not supported
-                        return;
-                    }
-
-                    if (isDictationPaused) {
-                        // 恢复
-                        isDictationPaused = false;
-                        pauseResumeButton.textContent = 'Pause';
-                        console.log('[PAUSE/RESUME] 点击Resume，直接调用speakNextWord，isDictationPaused:', isDictationPaused, 'speaking:', window.speechSynthesis.speaking, 'paused:', window.speechSynthesis.paused);
-                        speakNextWord();
-                    } else {
-                        // 暂停：取消当前语音，阻止后续朗读
-                        isDictationPaused = true;
-                        window.speechSynthesis.cancel();
-                        pauseResumeButton.textContent = 'Resume';
-                        console.log('[PAUSE/RESUME] 点击Pause，调用window.speechSynthesis.cancel()，isDictationPaused:', isDictationPaused, 'speaking:', window.speechSynthesis.speaking, 'paused:', window.speechSynthesis.paused);
-                    }
-                });
-            }
+            // 听写按钮
             if (dictateButton) {
                 dictateButton.addEventListener('click', () => {
-                    // Basic checks
                     if (!window.speechSynthesis) {
                         alert('您的浏览器不支持语音合成功能。');
-                        console.log('Speech synthesis not supported.');
                         return;
                     }
-
-                    window.speechSynthesis.cancel(); // 1. Stop any previous speech
-                    resetDictationState();           // 2. Reset state variables (currentWordsArray is now empty)
-
-                    const wordElements = document.querySelectorAll('.vocab-word'); // 3. Get words from DOM
-                    currentWordsArray = Array.from(wordElements).map(el => {    //    Repopulate currentWordsArray
-                        const firstChild = el.childNodes[0]; 
-                        return firstChild ? firstChild.textContent.trim() : '';
-                    }).filter(word => word);
-
-                    if (!currentWordsArray.length) { // 4. Check if currentWordsArray is empty
+                    window.speechSynthesis.cancel();
+                    resetDictationState();
+                    // 取最新词汇
+                    currentWordsArray = lastWordsArray.slice();
+                    if (!currentWordsArray.length) {
                         alert('请先添加词汇。');
-                        return; // No words to speak
+                        return;
                     }
-                    
-                    // 5. isDictationPaused is false (from resetDictationState)
-                    // 6. currentWordIndex is 0 (from resetDictationState)
-
-                    if (pauseResumeButton) { // 7. Update UI for pauseResumeButton
+                    if (pauseResumeButton) {
                         pauseResumeButton.style.display = 'inline-block';
                         pauseResumeButton.textContent = 'Pause';
                     }
-                    
-                    speakNextWord(); // 8. Start dictation sequence
+                    isDictating = true;
+                    renderVocabulary([]); // 听写时不显示词汇
+                    speakNextWord();
                 });
-            } else {
-                console.error('Dictate button not found.');
+            }
+
+            // 暂停/恢复
+            if (pauseResumeButton) {
+                pauseResumeButton.addEventListener('click', () => {
+                    if (!window.speechSynthesis) {
+                        resetDictationState();
+                        return;
+                    }
+                    if (isDictationPaused) {
+                        isDictationPaused = false;
+                        pauseResumeButton.textContent = 'Pause';
+                        speakNextWord();
+                    } else {
+                        isDictationPaused = true;
+                        window.speechSynthesis.cancel();
+                        pauseResumeButton.textContent = 'Resume';
+                    }
+                });
+            }
+
+            // 解释按钮：不显示文字，直接语音播报
+            if (globalExplainButton) {
+                globalExplainButton.addEventListener('click', async () => {
+                    if (!currentDictationWord) return;
+                    explanationArea.innerHTML = '';
+                    const apiKey = "AIzaSyBiPSZpw3anpuGCQ4OHJIFt3OokmG22RG4";
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                    const requestBody = {
+                        "contents": [{
+                            "parts": [{
+                                "text": "解释词语: " + currentDictationWord + ". 请用一句话，最简洁的语言解释。比如北京，中国的首都。"
+                            }]
+                        }]
+                    };
+                    try {
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(requestBody)
+                        });
+                        if (!response.ok) return;
+                        const data = await response.json();
+                        let explanation = '';
+                        if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) {
+                            explanation = data.candidates[0].content.parts[0].text;
+                        }
+                        if (explanation) {
+                            // 语音播报解释
+                            const utter = new SpeechSynthesisUtterance(explanation);
+                            utter.lang = 'zh-CN';
+                            window.speechSynthesis.speak(utter);
+                        }
+                    } catch (e) {}
+                });
+            }
+
+            function resetDictationState() {
+                isDictationPaused = false;
+                isDictating = false;
+                if (pauseResumeButton) {
+                    pauseResumeButton.textContent = 'Pause';
+                    pauseResumeButton.style.display = 'none';
+                }
+                currentWordsArray = [];
+                currentWordIndex = 0;
+                currentDictationWord = null;
             }
 
             function speakNextWord() {
-                console.log('[DICTATION] speakNextWord called, isDictationPaused:', isDictationPaused, 'currentWordIndex:', currentWordIndex, 'wordsArray:', currentWordsArray, 'speaking:', window.speechSynthesis.speaking, 'paused:', window.speechSynthesis.paused);
-                // If paused, do not proceed to speak. Wait for resume.
-                if (isDictationPaused) {
-                    console.log('[DICTATION] 暂停状态，speakNextWord直接return');
-                    return;
-                }
-
+                if (isDictationPaused) return;
                 if (currentWordIndex >= currentWordsArray.length) {
-                    // All words have been processed
-                    if (!window.speechSynthesis.speaking) { // Ensure no other speech (like the word itself) is active
+                    if (!window.speechSynthesis.speaking) {
                         const completionUtterance = new SpeechSynthesisUtterance("听写结束");
                         completionUtterance.lang = 'zh-CN';
-                        completionUtterance.onend = resetDictationState; // Reset after "听写结束"
-                        console.log('[DICTATION] 所有单词播报完毕，播报"听写结束"');
+                        completionUtterance.onend = () => {
+                            resetDictationState();
+                            renderVocabulary(lastWordsArray); // 听写结束后显示词汇
+                        };
                         window.speechSynthesis.speak(completionUtterance);
-                    } else {
-                        // If still speaking, the onend of the current word will handle this.
-                        console.log('[DICTATION] 所有单词播报完毕，但仍在speaking，等待onend触发');
                     }
                     return;
                 }
-
-                currentDictationWord = currentWordsArray[currentWordIndex]; // Update current dictation word
+                currentDictationWord = currentWordsArray[currentWordIndex];
                 const utterance = new SpeechSynthesisUtterance(currentDictationWord);
                 utterance.lang = 'zh-CN';
-                console.log('[DICTATION] 开始播报单词：', currentDictationWord, 'index:', currentWordIndex);
-                
                 utterance.onend = () => {
-                    console.log('[DICTATION] onend触发，isDictationPaused:', isDictationPaused, 'currentWordIndex:', currentWordIndex);
-                    if (isDictationPaused) { 
-                        // If paused, onend might fire. Do nothing, wait for resume.
-                        console.log('[DICTATION] onend时处于暂停状态，等待resume');
-                        return; 
-                    }
+                    if (isDictationPaused) return;
                     currentWordIndex++;
-                    // Check if there are more words or if it's the end
                     if (currentWordIndex < currentWordsArray.length) {
                         setTimeout(() => {
-                            if (!isDictationPaused) {
-                                console.log('[DICTATION] 延迟后继续播报下一个单词');
-                                speakNextWord();
-                            } else {
-                                console.log('[DICTATION] 延迟后发现已暂停，不继续播报');
-                            }
-                        }, 5000); // Delay before next word
+                            if (!isDictationPaused) speakNextWord();
+                        }, 5000);
                     } else {
-                        // Last word has been spoken, announce completion
                         const completionUtterance = new SpeechSynthesisUtterance("听写结束");
                         completionUtterance.lang = 'zh-CN';
-                        completionUtterance.onend = resetDictationState; // Reset after "听写结束"
-                        console.log('[DICTATION] 最后一个单词播报完毕，播报"听写结束"');
+                        completionUtterance.onend = () => {
+                            resetDictationState();
+                            renderVocabulary(lastWordsArray);
+                        };
                         window.speechSynthesis.speak(completionUtterance);
                     }
                 };
-                
                 utterance.onerror = (event) => {
-                    console.error('[DICTATION] SpeechSynthesisUtterance.onerror', event);
-                    resetDictationState(); // Reset state on any speech error
+                    resetDictationState();
                 };
-                
-                // Check if already speaking before trying to speak.
-                // This is a safeguard, though cancel() should handle it.
                 if (!window.speechSynthesis.speaking || window.speechSynthesis.paused) {
-                     console.log('[DICTATION] speakNextWord实际调用speak:', currentDictationWord);
-                     window.speechSynthesis.speak(utterance);
-                } else {
-                    // This case should ideally be handled by the overall state logic
-                    console.log("[DICTATION] Speech synthesis busy, utterance for '"+ currentWordsArray[currentWordIndex] +"' not spoken immediately.");
+                    window.speechSynthesis.speak(utterance);
                 }
             }
         });
