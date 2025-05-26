@@ -1,5 +1,6 @@
 import argparse
 import os
+import re
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 from werkzeug.utils import secure_filename
 from google import genai
@@ -30,7 +31,10 @@ def vocabulary():
     if request.method == 'POST':
         words_string = request.form.get('words', '')
         if words_string:
-            new_words = words_string.strip().split()
+            # Split by spaces, Chinese commas, or English commas
+            new_words = re.split(r'[,\s，]+', words_string.strip())
+            # Filter out any empty strings that might result from multiple delimiters
+            new_words = [word for word in new_words if word] 
             for word in new_words:
                 if word not in vocabulary_list: # Avoid duplicates
                     vocabulary_list.append(word)
